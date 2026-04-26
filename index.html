@@ -33,7 +33,6 @@
             display: flex;
             justify-content: space-between;
         }
-        /* タイマーバーの装飾 */
         #timerContainer {
             width: 100%;
             height: 20px;
@@ -48,7 +47,6 @@
             background-color: #0f0;
             transition: width 0.1s linear, background-color 0.1s;
         }
-        /* 三択ボタンの装飾 */
         .choices-container {
             display: flex;
             gap: 10px;
@@ -111,15 +109,15 @@ Press [START] to begin.</div>
         let hp = 100;
         let score = 0;
         let questionCount = 0;
-        const totalQuestions = 15; // 5問 x 3フェーズ
+        const totalQuestions = 15;
         
         let currentConst = 9;
         let currentRule = 8;
-        let currentCF = ''; // 定旋律(音名用)
+        let currentCF = '';
         let correctAnswer = '';
         
         let timerInterval;
-        let timeLeft = 3000; // 3秒 (3000ms)
+        let timeLeft = 3000;
         const timeLimit = 3000;
         
         const consonants = [1, 3, 5, 6, 8, 10, 12];
@@ -129,7 +127,6 @@ Press [START] to begin.</div>
             return consonants.includes(val) && consonants.includes(constVal - val);
         }
 
-        // 音名同士の度数計算 (例: CとE = 3度)
         function getInterval(base, target) {
             let b = notes.indexOf(base);
             let t = notes.indexOf(target);
@@ -139,7 +136,7 @@ Press [START] to begin.</div>
         }
 
         function print(text) {
-            output.innerHTML = text; // ログを流さず、常に上書きして視認性を高める
+            output.innerHTML = text;
         }
 
         function updateStatus() {
@@ -168,10 +165,12 @@ Press [START] to begin.</div>
 
             updateStatus();
             
-            // ルールの決定 (8, 10, 12度転回)
             const rules = [8, 10, 12];
             currentRule = rules[Math.floor(Math.random() * rules.length)];
             currentConst = currentRule === 8 ? 9 : (currentRule === 10 ? 11 : 13);
+            
+            // 現在の転回ルールを超えないように音程の限界値を設定
+            const maxInterval = currentRule;
             
             let phase = questionCount < 5 ? 1 : (questionCount < 10 ? 2 : 3);
             let safeChoices = [];
@@ -179,27 +178,29 @@ Press [START] to begin.</div>
             let qText = `[ 転回規則: ${currentRule}度転回 (y = ${currentConst} - x) ]\n\n`;
 
             if (phase === 1) {
-                // Phase 1: 単純な数字
                 qText += "安全な【音程】を選択せよ。";
-                for (let i=1; i<=12; i++) {
+                for (let i=1; i<=maxInterval; i++) {
                     if (isSafe(i, currentConst)) safeChoices.push(i.toString());
                     else unsafeChoices.push(i.toString());
                 }
             } else if (phase === 2) {
-                // Phase 2: 掛留を含む
                 qText += "安全な【掛留】または【音程】を選択せよ。";
-                for (let i=1; i<=12; i++) {
+                for (let i=1; i<=maxInterval; i++) {
                     if (isSafe(i, currentConst)) safeChoices.push(i.toString());
                     else unsafeChoices.push(i.toString());
                 }
-                const suspensions = ['7-6', '4-3', '9-8', '2-3', '6-5'];
+                const suspensions = ['7-6', '4-3', '9-8', '2-3', '6-5', '11-10'];
                 for (let s of suspensions) {
-                    let res = parseInt(s.split('-')[1]);
-                    if (isSafe(res, currentConst)) safeChoices.push(s);
-                    else unsafeChoices.push(s);
+                    let parts = s.split('-');
+                    let req1 = parseInt(parts[0]);
+                    let req2 = parseInt(parts[1]);
+                    // 掛留の音程が限界値を超えている場合は選択肢から除外
+                    if (req1 <= maxInterval && req2 <= maxInterval) {
+                        if (isSafe(req2, currentConst)) safeChoices.push(s);
+                        else unsafeChoices.push(s);
+                    }
                 }
             } else {
-                // Phase 3: 音名
                 currentCF = notes[Math.floor(Math.random() * notes.length)];
                 qText += `定旋律(CF)は 【 ${currentCF} 】 だ。\n安全な対位声部の【音名】を選択せよ。`;
                 for (let n of notes) {
@@ -209,11 +210,15 @@ Press [START] to begin.</div>
                 }
             }
 
+            // 安全な選択肢が存在しない場合のエラーハンドリング
+            if (safeChoices.length === 0) {
+                safeChoices.push('3'); // フォールバック
+            }
             correctAnswer = getUnique(safeChoices, 1)[0];
             let wrongs = getUnique(unsafeChoices, 2);
             
             let choices = [correctAnswer, wrongs[0], wrongs[1]];
-            choices.sort(() => 0.5 - Math.random()); // シャッフル
+            choices.sort(() => 0.5 - Math.random());
 
             print(qText);
             renderButtons(choices);
@@ -266,14 +271,14 @@ Press [START] to begin.</div>
             stopTimer();
             disableButtons();
             
-            let timeBonus = Math.floor(timeLeft / 100); // 早く答えるほど高得点
+            let timeBonus = Math.floor(timeLeft / 100);
             
             if (selected === correctAnswer) {
                 let pts = 50 + timeBonus;
                 score += pts;
                 print(`[ SUCCESS ] 正解だ。\nScore +${pts}`);
             } else {
-                hp -= 25; // 3秒制限でのミスは致命傷
+                hp -= 25;
                 print(`[ <span class="danger">FATAL</span> ] 不協和音が発生した。\n正解は [ ${correctAnswer} ] だ。\nDamage -25`);
             }
             
@@ -284,7 +289,7 @@ Press [START] to begin.</div>
 
         function handleTimeout() {
             disableButtons();
-            hp -= 30; // タイムアウトはさらに重いペナルティ
+            hp -= 30;
             print(`[ <span class="danger">TIME OUT</span> ] 思考が遅すぎる。\n正解は [ ${correctAnswer} ] だ。\nDamage -30`);
             updateStatus();
             questionCount++;
