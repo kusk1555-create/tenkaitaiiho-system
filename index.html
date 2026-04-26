@@ -20,7 +20,7 @@
         #console { 
             white-space: pre-wrap; 
             margin-bottom: 20px; 
-            min-height: 200px;
+            min-height: 220px;
             border-left: 2px solid #0f0;
             padding-left: 10px;
             font-size: 16px;
@@ -75,7 +75,7 @@
     </style>
 </head>
 <body>
-    <h1>INVERSION SURVIVAL - 3 SECONDS DEADLINE</h1>
+    <h1>INVERSION SURVIVAL - HARDCORE</h1>
     
     <div class="status-bar" id="statusBar">
         <span id="hpDisplay">HP: 100/100</span>
@@ -89,7 +89,7 @@
 
     <div id="console">Initializing Hardcore Engine...
 =========================================
- 3秒以内に「現在」も「転回後」も協和音になる
+ 「現在」も「転回後」も協和音になる
  選択肢をクリックして生き延びろ。
 =========================================
 Press [START] to begin.</div>
@@ -118,18 +118,15 @@ Press [START] to begin.</div>
         
         let timerInterval;
         let timeLeft = 3000;
-        const timeLimit = 3000;
+        let currentTimeLimit = 3000;
         
         const consonants = [1, 3, 5, 6, 8, 10, 12];
-        
-        // 音名とオクターブの定義（C3〜B5）
         const diatonicScale = [
             "C3", "D3", "E3", "F3", "G3", "A3", "B3",
             "C4", "D4", "E4", "F4", "G4", "A4", "B4",
             "C5", "D5", "E5", "F5", "G5", "A5", "B5"
         ];
 
-        // 解決後の音程が、現在も転回後も協和音かチェックする
         function isSafe(val, constVal) {
             return consonants.includes(val) && consonants.includes(constVal - val);
         }
@@ -143,7 +140,6 @@ Press [START] to begin.</div>
             scoreDisplay.innerText = `Score: ${score}`;
             let phase = questionCount < 5 ? 1 : (questionCount < 10 ? 2 : 3);
             stageDisplay.innerText = `Phase ${phase}/3 (Q.${questionCount+1})`;
-            
             if(hp <= 30) hpDisplay.style.color = '#ff5555';
         }
 
@@ -162,14 +158,24 @@ Press [START] to begin.</div>
                 return;
             }
 
+            // Phase 3開始前のブレイク判定
+            if (questionCount === 10) {
+                showPhase3Break();
+                return;
+            }
+
             updateStatus();
             
             const rules = [8, 10, 12];
             currentRule = rules[Math.floor(Math.random() * rules.length)];
             currentConst = currentRule === 8 ? 9 : (currentRule === 10 ? 11 : 13);
-            const maxInterval = currentRule; // ルール以上の音程は出題しない
+            const maxInterval = currentRule;
             
             let phase = questionCount < 5 ? 1 : (questionCount < 10 ? 2 : 3);
+            
+            // フェーズによって制限時間を変更
+            currentTimeLimit = (phase === 3) ? 5000 : 3000;
+
             let safeChoices = [];
             let unsafeChoices = [];
             let qText = `[ 転回規則: ${currentRule}度転回 (y = ${currentConst} - x) ]\n\n`;
@@ -186,7 +192,7 @@ Press [START] to begin.</div>
                     if (isSafe(i, currentConst)) safeChoices.push(i.toString());
                     else unsafeChoices.push(i.toString());
                 }
-                const suspensions = ['7-6', '4-3', '9-8', '2-3', '6-5', '11-10', '12-11'];
+                const suspensions = ['7-6', '4-3', '9-8', '2-3', '6-5', '11-10'];
                 for (let s of suspensions) {
                     let parts = s.split('-');
                     let req1 = parseInt(parts[0]);
@@ -197,31 +203,73 @@ Press [START] to begin.</div>
                     }
                 }
             } else {
-                // Phase 3: 実際の音名（オクターブ付き）
-                // C4(配列インデックス7) から G4(11) の間を定旋律(CF)とする
                 let cfIndex = Math.floor(Math.random() * 5) + 7;
                 currentCF = diatonicScale[cfIndex];
-                qText += `定旋律(下声)は 【 ${currentCF} 】 だ。\n安全な対位声部(上声)を選択せよ。`;
-                
-                // 定旋律から、1度〜maxInterval度 上までの音を選択肢として生成
+                qText += `定旋律(下声)は 【 ${currentCF} 】 だ。\n安全な対位声部(上声)を選択せよ。 (制限時間: 5秒)`;
                 for (let i = 0; i < maxInterval; i++) {
                     let targetIndex = cfIndex + i;
                     let targetNote = diatonicScale[targetIndex];
-                    let interval = i + 1; // 1度〜
-                    
+                    let interval = i + 1;
                     if (isSafe(interval, currentConst)) safeChoices.push(targetNote);
                     else unsafeChoices.push(targetNote);
                 }
             }
 
-            if (safeChoices.length === 0) safeChoices.push('3'); // 安全装置
-            
+            if (safeChoices.length === 0) safeChoices.push('3');
             correctAnswer = getUnique(safeChoices, 1)[0];
             let wrongs = getUnique(unsafeChoices, 2);
-            
             let choices = [correctAnswer, wrongs[0], wrongs[1]];
             choices.sort(() => 0.5 - Math.random());
 
+            print(qText);
+            renderButtons(choices);
+            startTimer();
+        }
+
+        function showPhase3Break() {
+            stopTimer();
+            timerBar.style.width = '0%';
+            let breakText = `[ PHASE 3 INCOMING ]\n=========================================\n最終警告：ここからは【実際の音名】による出題となる。\n\n例題：定旋律(下声)が C4 / 8度転回 の場合\n安全な選択肢は 3度上の E4 や 6度上の A4 などだ。\n\nこのフェーズのみ制限時間を 【 5秒 】 に延長する。\n=========================================\n準備はいいか？`;
+            print(breakText);
+            choicesContainer.innerHTML = '<button class="choice-btn" onclick="resumeAfterBreak()">READY?</button>';
+        }
+
+        function resumeAfterBreak() {
+            questionCount = 10.1; // 重複防止用の一時的な値
+            questionCount = 10;   // 実際には10問目からスタート
+            // 内部フラグを操作して10問目の判定を一度だけ飛ばす
+            let tempCount = questionCount;
+            questionCount = 10.5; 
+            setTimeout(() => {
+                questionCount = 10;
+                // ここで直接Phase 3の1問目を生成するためのハック
+                const originalQuestionCount = questionCount;
+                questionCount = 10.5; // generate内のチェックを回避
+                generatePhase3First();
+            }, 10);
+        }
+
+        function generatePhase3First() {
+            questionCount = 10;
+            // status-barの表示を更新するために偽のインクリメントを避ける
+            updateStatus();
+            // generateQuestionの中身を直接実行（ブレイク判定を避けるため）
+            const rules = [8, 10, 12];
+            currentRule = rules[Math.floor(Math.random() * rules.length)];
+            currentConst = currentRule === 8 ? 9 : (currentRule === 10 ? 11 : 13);
+            currentTimeLimit = 5000;
+            let cfIndex = Math.floor(Math.random() * 5) + 7;
+            currentCF = diatonicScale[cfIndex];
+            let qText = `[ 転回規則: ${currentRule}度転回 (y = ${currentConst} - x) ]\n\n`;
+            qText += `定旋律(下声)は 【 ${currentCF} 】 だ。\n安全な対位声部(上声)を選択せよ。 (制限時間: 5秒)`;
+            let safeChoices = []; let unsafeChoices = [];
+            for (let i = 0; i < currentRule; i++) {
+                let targetNote = diatonicScale[cfIndex + i];
+                if (isSafe(i + 1, currentConst)) safeChoices.push(targetNote);
+                else unsafeChoices.push(targetNote);
+            }
+            correctAnswer = getUnique(safeChoices, 1)[0];
+            let choices = [correctAnswer, ...getUnique(unsafeChoices, 2)].sort(() => 0.5 - Math.random());
             print(qText);
             renderButtons(choices);
             startTimer();
@@ -239,30 +287,20 @@ Press [START] to begin.</div>
         }
 
         function startTimer() {
-            timeLeft = timeLimit;
+            timeLeft = currentTimeLimit;
             timerBar.style.width = '100%';
             timerBar.style.backgroundColor = '#0f0';
-            
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 timeLeft -= 50;
-                let percent = (timeLeft / timeLimit) * 100;
+                let percent = (timeLeft / currentTimeLimit) * 100;
                 timerBar.style.width = `${percent}%`;
-                
-                if (percent < 30) {
-                    timerBar.style.backgroundColor = '#ff5555';
-                }
-                
-                if (timeLeft <= 0) {
-                    clearInterval(timerInterval);
-                    handleTimeout();
-                }
+                if (percent < 30) timerBar.style.backgroundColor = '#ff5555';
+                if (timeLeft <= 0) { clearInterval(timerInterval); handleTimeout(); }
             }, 50);
         }
 
-        function stopTimer() {
-            clearInterval(timerInterval);
-        }
+        function stopTimer() { clearInterval(timerInterval); }
 
         function disableButtons() {
             const btns = document.querySelectorAll('.choice-btn');
@@ -272,18 +310,15 @@ Press [START] to begin.</div>
         function handleChoice(selected) {
             stopTimer();
             disableButtons();
-            
             let timeBonus = Math.floor(timeLeft / 100);
-            
             if (selected === correctAnswer) {
                 let pts = 50 + timeBonus;
                 score += pts;
                 print(`[ SUCCESS ] 正解だ。\nScore +${pts}`);
             } else {
                 hp -= 25;
-                print(`[ <span class="danger">FATAL</span> ] 不協和音が発生した。\n正解は [ ${correctAnswer} ] だ。\nDamage -25`);
+                print(`[ <span class="danger">FATAL</span> ] 不協和音だ。\n正解は [ ${correctAnswer} ] だ。\nDamage -25`);
             }
-            
             updateStatus();
             questionCount++;
             setTimeout(generateQuestion, 1500);
@@ -299,9 +334,7 @@ Press [START] to begin.</div>
         }
 
         function startGame() {
-            hp = 100;
-            score = 0;
-            questionCount = 0;
+            hp = 100; score = 0; questionCount = 0;
             hpDisplay.style.color = '#0f0';
             generateQuestion();
         }
