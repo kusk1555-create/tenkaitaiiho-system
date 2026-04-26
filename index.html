@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Inversion Survival</title>
+    <title>Inversion Survival: Hardcore</title>
     <style>
         body { 
             background-color: #000; 
@@ -12,25 +12,18 @@
             line-height: 1.5;
             max-width: 800px;
             margin: 0 auto;
+            user-select: none;
         }
-        h1 { border-bottom: 2px solid #0f0; padding-bottom: 5px; }
-        .panel {
-            border: 1px dashed #0f0;
-            padding: 15px;
-            margin-bottom: 20px;
-            background-color: #001100;
-        }
-        .panel h2 { margin-top: 0; color: #fff; font-size: 16px;}
-        .highlight { color: #ffeb3b; }
+        h1 { border-bottom: 2px solid #0f0; padding-bottom: 5px; color: #ff0000; }
         .danger { color: #ff5555; }
-        .score-text { color: #00ffff; font-weight: bold; }
-        .skill-text { color: #ff00ff; font-weight: bold; }
+        .safe { color: #00ffff; }
         #console { 
             white-space: pre-wrap; 
             margin-bottom: 20px; 
-            min-height: 250px;
+            min-height: 200px;
             border-left: 2px solid #0f0;
             padding-left: 10px;
+            font-size: 16px;
         }
         .status-bar {
             background-color: #002200;
@@ -40,228 +33,277 @@
             display: flex;
             justify-content: space-between;
         }
-        .input-area { display: flex; gap: 10px; }
-        input { 
-            background: #000; 
-            color: #0f0; 
-            border: 1px solid #0f0; 
-            padding: 8px; 
-            font-family: monospace; 
-            flex-grow: 1;
-            font-size: 16px;
+        /* タイマーバーの装飾 */
+        #timerContainer {
+            width: 100%;
+            height: 20px;
+            border: 1px solid #0f0;
+            margin-bottom: 20px;
+            background-color: #001100;
+            position: relative;
         }
-        button { 
-            background: #0f0; 
-            color: #000; 
-            border: none; 
-            padding: 8px 16px; 
-            cursor: pointer; 
-            font-family: monospace; 
+        #timerBar {
+            height: 100%;
+            width: 100%;
+            background-color: #0f0;
+            transition: width 0.1s linear, background-color 0.1s;
+        }
+        /* 三択ボタンの装飾 */
+        .choices-container {
+            display: flex;
+            gap: 10px;
+        }
+        .choice-btn {
+            background: #000;
+            color: #0f0;
+            border: 2px solid #0f0;
+            padding: 20px;
+            font-size: 24px;
+            font-family: monospace;
             font-weight: bold;
-            font-size: 16px;
+            flex: 1;
+            cursor: pointer;
+            transition: all 0.1s;
         }
-        button:hover { background: #fff; }
+        .choice-btn:hover:not(:disabled) {
+            background: #0f0;
+            color: #000;
+        }
+        .choice-btn:disabled {
+            border-color: #333;
+            color: #333;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
-    <h1>Inversion Survival v2.1</h1>
+    <h1>INVERSION SURVIVAL - 3 SECONDS DEADLINE</h1>
     
-    <div class="panel">
-        <h2>[ MANUAL ]</h2>
-        <p>- 目的: 現在の音程と、転回後の音程の<span class="highlight">両方が「協和音」</span>になる数字を入力せよ。</p>
-        <p>- 協和音(Safe): 1, 3, 5, 6, 8, 10, 12 / 不協和音(Damage): 2, 4, 7, 9, 11</p>
-        <p>- コマンド一覧:</p>
-        <ul>
-            <li><code>3</code> : 通常入力。現在と転回後の両方をチェックされる。</li>
-            <li><code>7-6</code> : 掛留入力。一時的な不協和音を許容し、解決先(右側の数字)で判定される。</li>
-            <li><code>J</code> : スキル「自由声」。1ゲーム中3回のみ使用可能。強制的に和音を調和させ、判定をスキップする。</li>
-        </ul>
-    </div>
-
     <div class="status-bar" id="statusBar">
-        <span>HP: 100/100</span>
-        <span>J-Token: 3</span>
-        <span>Combo: 0</span>
-        <span>Score: 0</span>
+        <span id="hpDisplay">HP: 100/100</span>
+        <span id="stageDisplay">Phase 1/3</span>
+        <span id="scoreDisplay">Score: 0</span>
     </div>
 
-    <div id="console">Initializing Double Counterpoint Engine...
+    <div id="timerContainer">
+        <div id="timerBar"></div>
+    </div>
+
+    <div id="console">Initializing Hardcore Engine...
 =========================================
- INVERSION SURVIVAL - Terminal Edition
+ 3秒以内に「現在」も「転回後」も協和音になる
+ 選択肢をクリックして生き延びろ。
 =========================================
-Press Enter to start sequence.</div>
+Press [START] to begin.</div>
     
-    <div class="input-area">
-        <input type="text" id="userInput" placeholder="Input interval (e.g. 3, 7-6, J)" autocomplete="off">
-        <button onclick="handleInput()">Enter</button>
+    <div class="choices-container" id="choicesContainer">
+        <button class="choice-btn" id="startBtn" onclick="startGame()">START</button>
     </div>
 
     <script>
         const output = document.getElementById('console');
-        const input = document.getElementById('userInput');
-        const statusBar = document.getElementById('statusBar');
+        const hpDisplay = document.getElementById('hpDisplay');
+        const stageDisplay = document.getElementById('stageDisplay');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const timerBar = document.getElementById('timerBar');
+        const choicesContainer = document.getElementById('choicesContainer');
         
-        let state = 'init';
         let hp = 100;
         let score = 0;
-        let combo = 0;
-        let jTokens = 3;
-        let turn = 0;
-        let currentStage = 0;
-        let currentInv = 8;
-        let currentConstant = 9;
-        let lastInputVal = null;
+        let questionCount = 0;
+        const totalQuestions = 15; // 5問 x 3フェーズ
+        
+        let currentConst = 9;
+        let currentRule = 8;
+        let currentCF = ''; // 定旋律(音名用)
+        let correctAnswer = '';
+        
+        let timerInterval;
+        let timeLeft = 3000; // 3秒 (3000ms)
+        const timeLimit = 3000;
+        
+        const consonants = [1, 3, 5, 6, 8, 10, 12];
+        const notes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 
-        const stages = [
-            { name: "Stage 1: 8th Inversion (Basic)", invs: [8] },
-            { name: "Stage 2: 10th Inversion", invs: [10] },
-            { name: "Stage 3: 12th Inversion", invs: [12] },
-            { name: "Stage 4: Advanced Mix", invs: [8, 10, 12] }
-        ];
+        function isSafe(val, constVal) {
+            return consonants.includes(val) && consonants.includes(constVal - val);
+        }
 
-        function updateStatus() {
-            statusBar.innerHTML = `
-                <span>HP: ${hp}/100</span>
-                <span class="skill-text">J-Token: ${jTokens}</span>
-                <span class="highlight">Combo: ${combo}</span>
-                <span class="score-text">Score: ${score}</span>
-            `;
+        // 音名同士の度数計算 (例: CとE = 3度)
+        function getInterval(base, target) {
+            let b = notes.indexOf(base);
+            let t = notes.indexOf(target);
+            let diff = t - b;
+            if (diff < 0) diff += 7;
+            return diff + 1;
         }
 
         function print(text) {
-            output.innerHTML += '\n' + text;
-            window.scrollTo(0, document.body.scrollHeight);
+            output.innerHTML = text; // ログを流さず、常に上書きして視認性を高める
         }
 
-        function nextTurn() {
+        function updateStatus() {
+            hpDisplay.innerText = `HP: ${hp}/100`;
+            scoreDisplay.innerText = `Score: ${score}`;
+            let phase = questionCount < 5 ? 1 : (questionCount < 10 ? 2 : 3);
+            stageDisplay.innerText = `Phase ${phase}/3 (Q.${questionCount+1})`;
+            
+            if(hp <= 30) hpDisplay.style.color = '#ff5555';
+        }
+
+        function getUnique(arr, count) {
+            let shuffled = arr.slice().sort(() => 0.5 - Math.random());
+            return shuffled.slice(0, count);
+        }
+
+        function generateQuestion() {
             if (hp <= 0) {
-                print(`\n=========================================\n SEQUENCE TERMINATED. (GAME OVER)\n Final Score: <span class="score-text">${score} pts</span>\n=========================================`);
-                state = 'end';
+                endGame("FATAL ERROR. HP DEPLETED.");
                 return;
             }
-            if (turn >= 4) {
-                print(`\n[ ${stages[currentStage].name} Cleared ]`);
-                currentStage++;
-                turn = 0;
-                lastInputVal = null;
-                if (currentStage >= stages.length) {
-                    print(`\n=========================================\n COURSE PASSED. (CLEAR)\n Final Score: <span class="score-text">${score} pts</span>\n Remaining J-Tokens: ${jTokens} (Bonus +${jTokens * 100})\n Final Total: <span class="score-text">${score + (jTokens * 100)} pts</span>\n=========================================`);
-                    state = 'end';
-                    return;
+            if (questionCount >= totalQuestions) {
+                endGame("COURSE CLEARED. YOU ARE A MASTER.");
+                return;
+            }
+
+            updateStatus();
+            
+            // ルールの決定 (8, 10, 12度転回)
+            const rules = [8, 10, 12];
+            currentRule = rules[Math.floor(Math.random() * rules.length)];
+            currentConst = currentRule === 8 ? 9 : (currentRule === 10 ? 11 : 13);
+            
+            let phase = questionCount < 5 ? 1 : (questionCount < 10 ? 2 : 3);
+            let safeChoices = [];
+            let unsafeChoices = [];
+            let qText = `[ 転回規則: ${currentRule}度転回 (y = ${currentConst} - x) ]\n\n`;
+
+            if (phase === 1) {
+                // Phase 1: 単純な数字
+                qText += "安全な【音程】を選択せよ。";
+                for (let i=1; i<=12; i++) {
+                    if (isSafe(i, currentConst)) safeChoices.push(i.toString());
+                    else unsafeChoices.push(i.toString());
                 }
-            }
-            
-            const stage = stages[currentStage];
-            currentInv = stage.invs[Math.floor(Math.random() * stage.invs.length)];
-            currentConstant = currentInv === 8 ? 9 : (currentInv === 10 ? 11 : 13);
-            
-            print(`\n--- ${stage.name} ---`);
-            print(`[The Professor] Next Inversion: ${currentInv}th (Rule: y = ${currentConstant} - x)`);
-            print(`> `);
-            state = 'playing';
-        }
-
-        function handleInput() {
-            const val = input.value.trim().toUpperCase();
-            input.value = '';
-            
-            if (state === 'init') {
-                nextTurn();
-                return;
-            }
-            if (state !== 'playing') return;
-
-            print(val);
-
-            if (val === 'J') {
-                if (jTokens > 0) {
-                    jTokens--;
-                    combo++;
-                    const points = 20 * combo;
-                    score += points;
-                    print(`<span class="skill-text">[Skill Executed] 自由声 (Free Voice) が追加されました。</span>\n和音の不協和が補完されました。判定をスキップします。\n<span class="score-text">+${points} pts (Combo x${combo})</span>`);
-                    updateStatus();
-                    turn++;
-                    setTimeout(nextTurn, 1000);
-                    return;
-                } else {
-                    print(`<span class="danger">[Error] J-Tokenが不足しています。</span>`);
-                    return;
+            } else if (phase === 2) {
+                // Phase 2: 掛留を含む
+                qText += "安全な【掛留】または【音程】を選択せよ。";
+                for (let i=1; i<=12; i++) {
+                    if (isSafe(i, currentConst)) safeChoices.push(i.toString());
+                    else unsafeChoices.push(i.toString());
                 }
-            }
-
-            if (val === lastInputVal) {
-                hp -= 15;
-                combo = 0;
-                print(`<span class="danger">[Rule Violation] 連続進行</span>\n同じ音程を連続させることはできません。\nResult: Damage -15`);
-                updateStatus();
-                turn++;
-                setTimeout(nextTurn, 1000);
-                return;
-            }
-            
-            lastInputVal = val;
-            
-            // ハイフンでの判定に変更
-            const isSuspension = val.includes('-');
-            const consonants = [1, 3, 5, 6, 8, 10, 12];
-
-            if (isSuspension) {
-                // ハイフンで分割
-                const parts = val.split('-').map(Number);
-                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]) && parts[0] > 0 && parts[1] > 0) {
-                    const z = parts[1]; 
-                    const w = currentConstant - z; 
-                    
-                    print(`\n[Evaluation]\nResolution Interval: ${z}\nInverted Resolution: ${currentConstant} - ${z} = ${w}`);
-                    
-                    if (consonants.includes(z) && consonants.includes(w)) {
-                        combo++;
-                        const points = 50 * combo;
-                        score += points;
-                        print(`Status: Resolution is Consonant. (SAFE)\n<span class="score-text">+${points} pts (Suspension Bonus! Combo x${combo})</span>`);
-                    } else {
-                        hp -= 20;
-                        combo = 0;
-                        print(`Status: Resolution is Dissonant.\n<span class="danger">Result: FATAL. Damage -20.</span>\nReason: 解決先(${z}度)またはその転回形(${w}度)が不協和音です。`);
-                    }
-                } else {
-                    print("Invalid syntax."); return;
+                const suspensions = ['7-6', '4-3', '9-8', '2-3', '6-5'];
+                for (let s of suspensions) {
+                    let res = parseInt(s.split('-')[1]);
+                    if (isSafe(res, currentConst)) safeChoices.push(s);
+                    else unsafeChoices.push(s);
                 }
             } else {
-                const x = Number(val);
-                if (!isNaN(x) && x >= 1 && x <= 12) {
-                    const y = currentConstant - x;
-                    print(`\n[Evaluation]\nCurrent Interval: ${x}\nInverted Interval: ${currentConstant} - ${x} = ${y}`);
-                    
-                    if (!consonants.includes(x)) {
-                        hp -= 20;
-                        combo = 0;
-                        print(`Status: Dissonant (Current).\n<span class="danger">Result: FATAL. Damage -20.</span>\nReason: 入力された ${x}度 自体が不協和音です。`);
-                    } else if (!consonants.includes(y)) {
-                        hp -= 20;
-                        combo = 0;
-                        print(`Status: Dissonant (Inverted).\n<span class="danger">Result: FATAL. Damage -20.</span>\nReason: 転回後の ${y}度 が不協和音になります。`);
-                    } else {
-                        combo++;
-                        const basePoint = (y === 5 || y === 8) ? 30 : 10;
-                        const points = basePoint * combo;
-                        score += points;
-                        print(`Status: Consonant. (SAFE)\n<span class="score-text">+${points} pts (Combo x${combo})</span>`);
-                    }
-                } else {
-                    print("Invalid syntax."); return;
+                // Phase 3: 音名
+                currentCF = notes[Math.floor(Math.random() * notes.length)];
+                qText += `定旋律(CF)は 【 ${currentCF} 】 だ。\n安全な対位声部の【音名】を選択せよ。`;
+                for (let n of notes) {
+                    let iv = getInterval(currentCF, n);
+                    if (isSafe(iv, currentConst)) safeChoices.push(n);
+                    else unsafeChoices.push(n);
                 }
+            }
+
+            correctAnswer = getUnique(safeChoices, 1)[0];
+            let wrongs = getUnique(unsafeChoices, 2);
+            
+            let choices = [correctAnswer, wrongs[0], wrongs[1]];
+            choices.sort(() => 0.5 - Math.random()); // シャッフル
+
+            print(qText);
+            renderButtons(choices);
+            startTimer();
+        }
+
+        function renderButtons(choices) {
+            choicesContainer.innerHTML = '';
+            choices.forEach(choice => {
+                let btn = document.createElement('button');
+                btn.className = 'choice-btn';
+                btn.innerText = choice;
+                btn.onclick = () => handleChoice(choice);
+                choicesContainer.appendChild(btn);
+            });
+        }
+
+        function startTimer() {
+            timeLeft = timeLimit;
+            timerBar.style.width = '100%';
+            timerBar.style.backgroundColor = '#0f0';
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft -= 50;
+                let percent = (timeLeft / timeLimit) * 100;
+                timerBar.style.width = `${percent}%`;
+                
+                if (percent < 30) {
+                    timerBar.style.backgroundColor = '#ff5555';
+                }
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleTimeout();
+                }
+            }, 50);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
+
+        function disableButtons() {
+            const btns = document.querySelectorAll('.choice-btn');
+            btns.forEach(b => b.disabled = true);
+        }
+
+        function handleChoice(selected) {
+            stopTimer();
+            disableButtons();
+            
+            let timeBonus = Math.floor(timeLeft / 100); // 早く答えるほど高得点
+            
+            if (selected === correctAnswer) {
+                let pts = 50 + timeBonus;
+                score += pts;
+                print(`[ SUCCESS ] 正解だ。\nScore +${pts}`);
+            } else {
+                hp -= 25; // 3秒制限でのミスは致命傷
+                print(`[ <span class="danger">FATAL</span> ] 不協和音が発生した。\n正解は [ ${correctAnswer} ] だ。\nDamage -25`);
             }
             
             updateStatus();
-            turn++;
-            setTimeout(nextTurn, 1000);
+            questionCount++;
+            setTimeout(generateQuestion, 1500);
         }
 
-        input.addEventListener("keypress", function(event) {
-            if (event.key === "Enter") handleInput();
-        });
+        function handleTimeout() {
+            disableButtons();
+            hp -= 30; // タイムアウトはさらに重いペナルティ
+            print(`[ <span class="danger">TIME OUT</span> ] 思考が遅すぎる。\n正解は [ ${correctAnswer} ] だ。\nDamage -30`);
+            updateStatus();
+            questionCount++;
+            setTimeout(generateQuestion, 1500);
+        }
+
+        function startGame() {
+            hp = 100;
+            score = 0;
+            questionCount = 0;
+            hpDisplay.style.color = '#0f0';
+            generateQuestion();
+        }
+
+        function endGame(msg) {
+            choicesContainer.innerHTML = '<button class="choice-btn" onclick="startGame()">RESTART</button>';
+            print(`=========================================\n ${msg}\n Final Score: ${score}\n=========================================`);
+            timerBar.style.width = '0%';
+        }
     </script>
 </body>
 </html>
