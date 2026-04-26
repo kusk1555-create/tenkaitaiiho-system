@@ -121,18 +121,17 @@ Press [START] to begin.</div>
         const timeLimit = 3000;
         
         const consonants = [1, 3, 5, 6, 8, 10, 12];
-        const notes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+        
+        // 音名とオクターブの定義（C3〜B5）
+        const diatonicScale = [
+            "C3", "D3", "E3", "F3", "G3", "A3", "B3",
+            "C4", "D4", "E4", "F4", "G4", "A4", "B4",
+            "C5", "D5", "E5", "F5", "G5", "A5", "B5"
+        ];
 
+        // 解決後の音程が、現在も転回後も協和音かチェックする
         function isSafe(val, constVal) {
             return consonants.includes(val) && consonants.includes(constVal - val);
-        }
-
-        function getInterval(base, target) {
-            let b = notes.indexOf(base);
-            let t = notes.indexOf(target);
-            let diff = t - b;
-            if (diff < 0) diff += 7;
-            return diff + 1;
         }
 
         function print(text) {
@@ -168,9 +167,7 @@ Press [START] to begin.</div>
             const rules = [8, 10, 12];
             currentRule = rules[Math.floor(Math.random() * rules.length)];
             currentConst = currentRule === 8 ? 9 : (currentRule === 10 ? 11 : 13);
-            
-            // 現在の転回ルールを超えないように音程の限界値を設定
-            const maxInterval = currentRule;
+            const maxInterval = currentRule; // ルール以上の音程は出題しない
             
             let phase = questionCount < 5 ? 1 : (questionCount < 10 ? 2 : 3);
             let safeChoices = [];
@@ -189,31 +186,36 @@ Press [START] to begin.</div>
                     if (isSafe(i, currentConst)) safeChoices.push(i.toString());
                     else unsafeChoices.push(i.toString());
                 }
-                const suspensions = ['7-6', '4-3', '9-8', '2-3', '6-5', '11-10'];
+                const suspensions = ['7-6', '4-3', '9-8', '2-3', '6-5', '11-10', '12-11'];
                 for (let s of suspensions) {
                     let parts = s.split('-');
                     let req1 = parseInt(parts[0]);
                     let req2 = parseInt(parts[1]);
-                    // 掛留の音程が限界値を超えている場合は選択肢から除外
                     if (req1 <= maxInterval && req2 <= maxInterval) {
                         if (isSafe(req2, currentConst)) safeChoices.push(s);
                         else unsafeChoices.push(s);
                     }
                 }
             } else {
-                currentCF = notes[Math.floor(Math.random() * notes.length)];
-                qText += `定旋律(CF)は 【 ${currentCF} 】 だ。\n安全な対位声部の【音名】を選択せよ。`;
-                for (let n of notes) {
-                    let iv = getInterval(currentCF, n);
-                    if (isSafe(iv, currentConst)) safeChoices.push(n);
-                    else unsafeChoices.push(n);
+                // Phase 3: 実際の音名（オクターブ付き）
+                // C4(配列インデックス7) から G4(11) の間を定旋律(CF)とする
+                let cfIndex = Math.floor(Math.random() * 5) + 7;
+                currentCF = diatonicScale[cfIndex];
+                qText += `定旋律(下声)は 【 ${currentCF} 】 だ。\n安全な対位声部(上声)を選択せよ。`;
+                
+                // 定旋律から、1度〜maxInterval度 上までの音を選択肢として生成
+                for (let i = 0; i < maxInterval; i++) {
+                    let targetIndex = cfIndex + i;
+                    let targetNote = diatonicScale[targetIndex];
+                    let interval = i + 1; // 1度〜
+                    
+                    if (isSafe(interval, currentConst)) safeChoices.push(targetNote);
+                    else unsafeChoices.push(targetNote);
                 }
             }
 
-            // 安全な選択肢が存在しない場合のエラーハンドリング
-            if (safeChoices.length === 0) {
-                safeChoices.push('3'); // フォールバック
-            }
+            if (safeChoices.length === 0) safeChoices.push('3'); // 安全装置
+            
             correctAnswer = getUnique(safeChoices, 1)[0];
             let wrongs = getUnique(unsafeChoices, 2);
             
