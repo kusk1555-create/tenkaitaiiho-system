@@ -14,19 +14,31 @@
             margin: 0 auto;
         }
         h1 { border-bottom: 2px solid #0f0; padding-bottom: 5px; }
-        .tutorial-panel {
+        .panel {
             border: 1px dashed #0f0;
             padding: 15px;
             margin-bottom: 20px;
             background-color: #001100;
         }
-        .tutorial-panel h2 { margin-top: 0; color: #fff; }
-        .highlight { color: #ffeb3b; } /* 注意を引くための黄色 */
-        .danger { color: #ff5555; }    /* ダメージ用の赤 */
+        .panel h2 { margin-top: 0; color: #fff; font-size: 16px;}
+        .highlight { color: #ffeb3b; }
+        .danger { color: #ff5555; }
+        .score-text { color: #00ffff; font-weight: bold; }
+        .skill-text { color: #ff00ff; font-weight: bold; }
         #console { 
             white-space: pre-wrap; 
             margin-bottom: 20px; 
-            min-height: 200px;
+            min-height: 250px;
+            border-left: 2px solid #0f0;
+            padding-left: 10px;
+        }
+        .status-bar {
+            background-color: #002200;
+            padding: 5px 10px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
         }
         .input-area { display: flex; gap: 10px; }
         input { 
@@ -52,79 +64,88 @@
     </style>
 </head>
 <body>
-    <h1>🎵 Inversion Survival</h1>
+    <h1>Inversion Survival v2.0</h1>
     
-    <div class="tutorial-panel">
-        <h2>【HOW TO PLAY / 遊び方】</h2>
-        <p>CPU（教授）が指定する「転回」を予測し、転回後も<span class="highlight">「協和音」</span>になるような音程（数字）を入力して生き延びてください。</p>
-        
+    <div class="panel">
+        <h2>[ MANUAL ]</h2>
+        <p>- 目的: 現在の音程と、転回後の音程の<span class="highlight">両方が「協和音」</span>になる数字を入力せよ。</p>
+        <p>- 協和音(Safe): 1, 3, 5, 6, 8, 10, 12 / 不協和音(Damage): 2, 4, 7, 9, 11</p>
+        <p>- コマンド一覧:</p>
         <ul>
-            <li><span class="highlight">協和音（Safe）:</span> 1, 3, 5, 6, 8, 10, 12</li>
-            <li><span class="danger">不協和音（Damage）:</span> 2, 4, 7, 9, 11</li>
-        </ul>
-
-        <p><b>■ 入力方法（コマンド）</b></p>
-        <ul>
-            <li><b>通常入力：</b> <code>3</code> や <code>6</code> などの数字を直接入力します。</li>
-            <li><b>掛留（けいりゅう）：</b> <code>7->6</code> のように入力します。転回直後に不協和音になっても、解決先（矢印の右側）が協和音に変化すればノーダメージになります。</li>
-        </ul>
-
-        <p><b>■ 教授の転回公式（チートシート）</b></p>
-        <ul>
-            <li>8度転回: <code>y = 9 - x</code> （例: 5度を入力すると 9-5=4度 となり不協和音！）</li>
-            <li>10度転回: <code>y = 11 - x</code></li>
-            <li>12度転回: <code>y = 13 - x</code></li>
+            <li><code>3</code> : 通常入力。現在と転回後の両方をチェックされる。</li>
+            <li><code>7->6</code> : 掛留入力。一時的な不協和音を許容し、解決先(右側の数字)で判定される。</li>
+            <li><code>J</code> : 「自由声」。1ゲーム中3回のみ使用可能。強制的に和音を調和させ、判定をスキップする。</li>
         </ul>
     </div>
 
-    <div id="console">=========================================
- INVERSION SURVIVAL - Browser Edition
+    <div class="status-bar" id="statusBar">
+        <span>HP: 100/100</span>
+        <span>J-Token: 3</span>
+        <span>Combo: 0</span>
+        <span>Score: 0</span>
+    </div>
+
+    <div id="console">Initializing Double Counterpoint Engine...
 =========================================
-Start game? (Press Enter)</div>
+ INVERSION SURVIVAL - Terminal Edition
+=========================================
+Press Enter to start sequence.</div>
     
     <div class="input-area">
-        <input type="text" id="userInput" placeholder="音程を入力 (例: 3, 6, 7->6)" autocomplete="off">
+        <input type="text" id="userInput" placeholder="Input interval (e.g. 3, 7->6, J)" autocomplete="off">
         <button onclick="handleInput()">Enter</button>
     </div>
 
     <script>
         const output = document.getElementById('console');
         const input = document.getElementById('userInput');
+        const statusBar = document.getElementById('statusBar');
+        
         let state = 'init';
         let hp = 100;
+        let score = 0;
+        let combo = 0;
+        let jTokens = 3;
         let turn = 0;
         let currentStage = 0;
         let currentInv = 8;
         let currentConstant = 9;
+        let lastInputVal = null;
 
         const stages = [
-            { name: "Stage 1: 8th Inversion (8度転回)", invs: [8] },
-            { name: "Stage 2: 10th Inversion (10度転回)", invs: [10] },
-            { name: "Stage 3: 12th Inversion (12度転回)", invs: [12] }
+            { name: "Stage 1: 8th Inversion (Basic)", invs: [8] },
+            { name: "Stage 2: 10th Inversion", invs: [10] },
+            { name: "Stage 3: 12th Inversion", invs: [12] },
+            { name: "Stage 4: Advanced Mix", invs: [8, 10, 12] }
         ];
 
-        function print(text) {
-            output.textContent += '\n' + text;
-            // 自動で一番下までスクロール
-            window.scrollTo(0, document.body.scrollHeight);
+        function updateStatus() {
+            statusBar.innerHTML = `
+                <span>HP: ${hp}/100</span>
+                <span class="skill-text">J-Token: ${jTokens}</span>
+                <span class="highlight">Combo: ${combo}</span>
+                <span class="score-text">Score: ${score}</span>
+            `;
         }
 
-        function getConstant(inv) {
-            return inv === 8 ? 9 : (inv === 10 ? 11 : 13);
+        function print(text) {
+            output.innerHTML += '\n' + text;
+            window.scrollTo(0, document.body.scrollHeight);
         }
 
         function nextTurn() {
             if (hp <= 0) {
-                print("\n=========================================\n GAME OVER. You failed the course.\n=========================================");
+                print(`\n=========================================\n SEQUENCE TERMINATED. (GAME OVER)\n Final Score: <span class="score-text">${score} pts</span>\n=========================================`);
                 state = 'end';
                 return;
             }
-            if (turn >= 3) {
-                print(`\n[${stages[currentStage].name} cleared]`);
+            if (turn >= 4) {
+                print(`\n[ ${stages[currentStage].name} Cleared ]`);
                 currentStage++;
                 turn = 0;
+                lastInputVal = null;
                 if (currentStage >= stages.length) {
-                    print(`\n=========================================\n YOU SURVIVED.\n Final HP: ${hp}/100\n=========================================`);
+                    print(`\n=========================================\n COURSE PASSED. (CLEAR)\n Final Score: <span class="score-text">${score} pts</span>\n Remaining J-Tokens: ${jTokens} (Bonus +${jTokens * 100})\n Final Total: <span class="score-text">${score + (jTokens * 100)} pts</span>\n=========================================`);
                     state = 'end';
                     return;
                 }
@@ -132,16 +153,16 @@ Start game? (Press Enter)</div>
             
             const stage = stages[currentStage];
             currentInv = stage.invs[Math.floor(Math.random() * stage.invs.length)];
-            currentConstant = getConstant(currentInv);
+            currentConstant = currentInv === 8 ? 9 : (currentInv === 10 ? 11 : 13);
             
             print(`\n--- ${stage.name} ---`);
-            print(`[Professor]\nNext Inversion: ${currentInv}th (公式: ${currentConstant} - x)`);
-            print(`\n[Your Turn]\n> `);
+            print(`[The Professor] Next Inversion: ${currentInv}th (Rule: y = ${currentConstant} - x)`);
+            print(`> `);
             state = 'playing';
         }
 
         function handleInput() {
-            const val = input.value.trim();
+            const val = input.value.trim().toUpperCase();
             input.value = '';
             
             if (state === 'init') {
@@ -151,47 +172,93 @@ Start game? (Press Enter)</div>
             if (state !== 'playing') return;
 
             print(val);
+
+            // スキル：自由声 (J-Token) の処理
+            if (val === 'J') {
+                if (jTokens > 0) {
+                    jTokens--;
+                    combo++;
+                    const points = 20 * combo;
+                    score += points;
+                    print(`<span class="skill-text">[Skill Executed] 自由声 (Free Voice) が追加されました。</span>\n和音の不協和が補完されました。判定をスキップします。\n<span class="score-text">+${points} pts (Combo x${combo})</span>`);
+                    updateStatus();
+                    turn++;
+                    setTimeout(nextTurn, 1000);
+                    return;
+                } else {
+                    print(`<span class="danger">[Error] J-Tokenが不足しています。</span>`);
+                    return;
+                }
+            }
+
+            // 連続進行のペナルティ
+            if (val === lastInputVal) {
+                hp -= 15;
+                combo = 0;
+                print(`<span class="danger">[Rule Violation] 連続進行</span>\n同じ音程を連続させることはできません。\nResult: Damage -15`);
+                updateStatus();
+                turn++;
+                setTimeout(nextTurn, 1000);
+                return;
+            }
             
+            lastInputVal = val;
             const isSuspension = val.includes('->');
             const consonants = [1, 3, 5, 6, 8, 10, 12];
 
             if (isSuspension) {
                 const parts = val.split('->').map(Number);
                 if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-                    const invA = currentConstant - parts[0];
-                    const invB = currentConstant - parts[1];
-                    print(`\n[Result]\nInversion (${currentInv}th): Evaluated as ${invA}->${invB}`);
-                    if (consonants.includes(invB)) {
-                        print("Evaluation: Resolution to Consonant. (Safe)");
+                    const z = parts[1]; // 解決先の現在音程
+                    const w = currentConstant - z; // 解決先の転回後音程
+                    
+                    print(`\n[Evaluation]\nResolution Interval: ${z}\nInverted Resolution: ${currentConstant} - ${z} = ${w}`);
+                    
+                    if (consonants.includes(z) && consonants.includes(w)) {
+                        combo++;
+                        const points = 50 * combo;
+                        score += points;
+                        print(`Status: Resolution is Consonant. (SAFE)\n<span class="score-text">+${points} pts (Suspension Bonus! Combo x${combo})</span>`);
                     } else {
                         hp -= 20;
-                        print(`Evaluation: Resolution to Dissonant.\nResult: FATAL. Damage -20.\nReason: 解決先（${invB}度）が不協和音です。`);
+                        combo = 0;
+                        print(`Status: Resolution is Dissonant.\n<span class="danger">Result: FATAL. Damage -20.</span>\nReason: 解決先(${z}度)またはその転回形(${w}度)が不協和音です。`);
                     }
                 } else {
-                    print("Invalid format. 正しい形式で入力してください。"); return;
+                    print("Invalid syntax."); return;
                 }
             } else {
                 const x = Number(val);
                 if (!isNaN(x) && x >= 1 && x <= 12) {
                     const y = currentConstant - x;
-                    print(`\n[Result]\nInversion (${currentInv}th): ${currentConstant} - ${x} = ${y}`);
-                    if (consonants.includes(y)) {
-                        print(`Evaluation: Consonant (${y}th). (Safe)`);
-                    } else {
+                    print(`\n[Evaluation]\nCurrent Interval: ${x}\nInverted Interval: ${currentConstant} - ${x} = ${y}`);
+                    
+                    // バグ修正: 現在の音程(x)と転回後の音程(y)の両方をチェックする
+                    if (!consonants.includes(x)) {
                         hp -= 20;
-                        print(`Evaluation: Dissonant (${y}th).\nResult: FATAL. Damage -20.\nReason: 転回後の ${y}度 は不協和音です。`);
+                        combo = 0;
+                        print(`Status: Dissonant (Current).\n<span class="danger">Result: FATAL. Damage -20.</span>\nReason: 入力された ${x}度 自体が不協和音です。`);
+                    } else if (!consonants.includes(y)) {
+                        hp -= 20;
+                        combo = 0;
+                        print(`Status: Dissonant (Inverted).\n<span class="danger">Result: FATAL. Damage -20.</span>\nReason: 転回後の ${y}度 が不協和音になります。`);
+                    } else {
+                        combo++;
+                        const basePoint = (y === 5 || y === 8) ? 30 : 10;
+                        const points = basePoint * combo;
+                        score += points;
+                        print(`Status: Consonant. (SAFE)\n<span class="score-text">+${points} pts (Combo x${combo})</span>`);
                     }
                 } else {
-                    print("Invalid input. 1から12の数字を入力してください。"); return;
+                    print("Invalid syntax."); return;
                 }
             }
             
-            print(`Current HP: ${hp}/100`);
+            updateStatus();
             turn++;
-            setTimeout(nextTurn, 800); // テンポよく進めるために少し待機
+            setTimeout(nextTurn, 1000);
         }
 
-        // Enterキーで送信できるようにする
         input.addEventListener("keypress", function(event) {
             if (event.key === "Enter") handleInput();
         });
