@@ -4,19 +4,88 @@
     <meta charset="UTF-8">
     <title>Inversion Survival</title>
     <style>
-        body { background-color: #000; color: #0f0; font-family: monospace; padding: 20px; }
-        #console { white-space: pre-wrap; margin-bottom: 20px; }
-        input { background: #000; color: #0f0; border: 1px solid #0f0; padding: 5px; font-family: monospace; }
-        button { background: #0f0; color: #000; border: none; padding: 5px 10px; cursor: pointer; font-family: monospace; }
+        body { 
+            background-color: #000; 
+            color: #0f0; 
+            font-family: monospace; 
+            padding: 20px; 
+            line-height: 1.5;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 { border-bottom: 2px solid #0f0; padding-bottom: 5px; }
+        .tutorial-panel {
+            border: 1px dashed #0f0;
+            padding: 15px;
+            margin-bottom: 20px;
+            background-color: #001100;
+        }
+        .tutorial-panel h2 { margin-top: 0; color: #fff; }
+        .highlight { color: #ffeb3b; } /* 注意を引くための黄色 */
+        .danger { color: #ff5555; }    /* ダメージ用の赤 */
+        #console { 
+            white-space: pre-wrap; 
+            margin-bottom: 20px; 
+            min-height: 200px;
+        }
+        .input-area { display: flex; gap: 10px; }
+        input { 
+            background: #000; 
+            color: #0f0; 
+            border: 1px solid #0f0; 
+            padding: 8px; 
+            font-family: monospace; 
+            flex-grow: 1;
+            font-size: 16px;
+        }
+        button { 
+            background: #0f0; 
+            color: #000; 
+            border: none; 
+            padding: 8px 16px; 
+            cursor: pointer; 
+            font-family: monospace; 
+            font-weight: bold;
+            font-size: 16px;
+        }
+        button:hover { background: #fff; }
     </style>
 </head>
 <body>
+    <h1>🎵 Inversion Survival</h1>
+    
+    <div class="tutorial-panel">
+        <h2>【HOW TO PLAY / 遊び方】</h2>
+        <p>CPU（教授）が指定する「転回」を予測し、転回後も<span class="highlight">「協和音」</span>になるような音程（数字）を入力して生き延びてください。</p>
+        
+        <ul>
+            <li><span class="highlight">協和音（Safe）:</span> 1, 3, 5, 6, 8, 10, 12</li>
+            <li><span class="danger">不協和音（Damage）:</span> 2, 4, 7, 9, 11</li>
+        </ul>
+
+        <p><b>■ 入力方法（コマンド）</b></p>
+        <ul>
+            <li><b>通常入力：</b> <code>3</code> や <code>6</code> などの数字を直接入力します。</li>
+            <li><b>掛留（けいりゅう）：</b> <code>7->6</code> のように入力します。転回直後に不協和音になっても、解決先（矢印の右側）が協和音に変化すればノーダメージになります。</li>
+        </ul>
+
+        <p><b>■ 教授の転回公式（チートシート）</b></p>
+        <ul>
+            <li>8度転回: <code>y = 9 - x</code> （例: 5度を入力すると 9-5=4度 となり不協和音！）</li>
+            <li>10度転回: <code>y = 11 - x</code></li>
+            <li>12度転回: <code>y = 13 - x</code></li>
+        </ul>
+    </div>
+
     <div id="console">=========================================
  INVERSION SURVIVAL - Browser Edition
 =========================================
-Start game?</div>
-    <input type="text" id="userInput" placeholder="Type here..." autocomplete="off">
-    <button onclick="handleInput()">Enter</button>
+Start game? (Press Enter)</div>
+    
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="音程を入力 (例: 3, 6, 7->6)" autocomplete="off">
+        <button onclick="handleInput()">Enter</button>
+    </div>
 
     <script>
         const output = document.getElementById('console');
@@ -29,13 +98,14 @@ Start game?</div>
         let currentConstant = 9;
 
         const stages = [
-            { name: "Stage 1: 8th Inversion", invs: [8] },
-            { name: "Stage 2: 10th Inversion", invs: [10] },
-            { name: "Stage 3: 12th Inversion", invs: [12] }
+            { name: "Stage 1: 8th Inversion (8度転回)", invs: [8] },
+            { name: "Stage 2: 10th Inversion (10度転回)", invs: [10] },
+            { name: "Stage 3: 12th Inversion (12度転回)", invs: [12] }
         ];
 
         function print(text) {
             output.textContent += '\n' + text;
+            // 自動で一番下までスクロール
             window.scrollTo(0, document.body.scrollHeight);
         }
 
@@ -65,8 +135,8 @@ Start game?</div>
             currentConstant = getConstant(currentInv);
             
             print(`\n--- ${stage.name} ---`);
-            print(`[Professor]\nNext Inversion: ${currentInv}th (y = ${currentConstant} - x)`);
-            print(`\n[Your Turn]\nEnter interval (e.g., '3', '7->6'): > `);
+            print(`[Professor]\nNext Inversion: ${currentInv}th (公式: ${currentConstant} - x)`);
+            print(`\n[Your Turn]\n> `);
             state = 'playing';
         }
 
@@ -95,10 +165,10 @@ Start game?</div>
                         print("Evaluation: Resolution to Consonant. (Safe)");
                     } else {
                         hp -= 20;
-                        print(`Evaluation: Resolution to Dissonant.\nResult: FATAL. Damage -20.\nReason: 解決先が不協和音です。`);
+                        print(`Evaluation: Resolution to Dissonant.\nResult: FATAL. Damage -20.\nReason: 解決先（${invB}度）が不協和音です。`);
                     }
                 } else {
-                    print("Invalid format."); return;
+                    print("Invalid format. 正しい形式で入力してください。"); return;
                 }
             } else {
                 const x = Number(val);
@@ -109,18 +179,19 @@ Start game?</div>
                         print(`Evaluation: Consonant (${y}th). (Safe)`);
                     } else {
                         hp -= 20;
-                        print(`Evaluation: Dissonant (${y}th).\nResult: FATAL. Damage -20.\nReason: ${y}度は不協和音です。`);
+                        print(`Evaluation: Dissonant (${y}th).\nResult: FATAL. Damage -20.\nReason: 転回後の ${y}度 は不協和音です。`);
                     }
                 } else {
-                    print("Invalid input."); return;
+                    print("Invalid input. 1から12の数字を入力してください。"); return;
                 }
             }
             
             print(`Current HP: ${hp}/100`);
             turn++;
-            setTimeout(nextTurn, 1000);
+            setTimeout(nextTurn, 800); // テンポよく進めるために少し待機
         }
 
+        // Enterキーで送信できるようにする
         input.addEventListener("keypress", function(event) {
             if (event.key === "Enter") handleInput();
         });
